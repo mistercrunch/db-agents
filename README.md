@@ -334,6 +334,191 @@ When producing SQL:
 
 ---
 
+## Complete Example
+
+This example demonstrates DB-AGENTS in action using a hypothetical e-commerce database.
+
+### Sample Database Structure
+
+Tables:
+- `ecommerce.customers` — customer profiles
+- `ecommerce.products` — product catalog
+- `ecommerce.orders` — order headers
+- `ecommerce.order_items` — individual line items per order
+
+### 1. Sample `_agents._agents` Table
+
+```sql
+-- Sample entries in _agents._agents
+INSERT INTO _agents._agents (resource_type, resource_name, description, full_markdown) VALUES
+
+-- Global context
+('global', 'global', 'E-commerce data warehouse conventions and standards',
+'# E-commerce Data Warehouse
+
+## Canonical Sources
+- **Orders**: Always use `ecommerce.orders` joined with `ecommerce.order_items` for revenue analysis
+- **Products**: `ecommerce.products` is the canonical product catalog
+
+## Performance Rules
+- Always filter `orders` by `order_date` when possible (partitioned column)
+- Avoid SELECT * on `order_items` (high row count)
+
+## Business Definitions
+- **Revenue**: Use `order_items.quantity * order_items.unit_price`, NOT `orders.total_amount` (includes shipping/tax)
+- **Active Customer**: Placed an order in the last 90 days
+
+## Join Patterns
+- `orders.customer_id = customers.customer_id`
+- `order_items.order_id = orders.order_id`
+- `order_items.product_id = products.product_id`
+'),
+
+-- Domain-level context
+('domain', 'revenue_analysis', 'Guidelines for revenue and sales analytics',
+'# Revenue Analysis Guidelines
+
+## Key Principles
+- Always calculate revenue at the order_items level
+- Join to products table for category rollups
+- Filter out canceled orders: `orders.status != ''canceled''`
+
+## Common Pitfalls
+- Do NOT use `orders.total_amount` for product/category revenue (includes non-product charges)
+- Do NOT forget to exclude test orders: `customers.is_test = false`
+'),
+
+-- Table-level context
+('table', 'ecommerce.orders', 'Order headers with customer and fulfillment info',
+'# ecommerce.orders
+
+## Purpose
+Order-level information including customer, dates, and fulfillment status.
+
+## Key Columns
+- `order_id` (PK)
+- `customer_id` (FK to customers)
+- `order_date` (partition key, always filter on this for performance)
+- `status` (pending, shipped, delivered, canceled)
+- `total_amount` (includes product revenue + shipping + tax)
+
+## Critical Notes
+- `total_amount` should NOT be used for product revenue analysis
+- Always join to `order_items` for line-level detail
+'),
+
+('table', 'ecommerce.order_items', 'Line items showing products purchased per order',
+'# ecommerce.order_items
+
+## Purpose
+Individual products within each order.
+
+## Key Columns
+- `order_item_id` (PK)
+- `order_id` (FK to orders)
+- `product_id` (FK to products)
+- `quantity`
+- `unit_price` (price per unit at time of purchase)
+
+## Revenue Calculation
+**Always use**: `quantity * unit_price` for line-item revenue
+'),
+
+('table', 'ecommerce.products', 'Product catalog with categories',
+'# ecommerce.products
+
+## Key Columns
+- `product_id` (PK)
+- `product_name`
+- `category` (Electronics, Clothing, Home & Garden, Books, Sports)
+- `current_price` (may differ from historical `order_items.unit_price`)
+');
+```
+
+### 2. Session Start: Global Context Retrieval
+
+When an agent session begins, it runs:
+
+```sql
+-- Step 1: Index all resources
+SELECT resource_type, resource_name, description
+FROM _agents._agents
+ORDER BY resource_type, resource_name;
+```
+
+**Results:**
+```
+resource_type | resource_name           | description
+--------------+-------------------------+---------------------------------------------
+domain        | revenue_analysis        | Guidelines for revenue and sales analytics
+global        | global                  | E-commerce data warehouse conventions...
+table         | ecommerce.orders        | Order headers with customer and fulfillment
+table         | ecommerce.order_items   | Line items showing products purchased
+table         | ecommerce.products      | Product catalog with categories
+```
+
+```sql
+-- Step 2: Load global context
+SELECT resource_name, description, full_markdown
+FROM _agents._agents
+WHERE resource_type = 'global';
+```
+
+The agent now has the warehouse conventions in context, including:
+- Canonical sources
+- Performance rules (partition filtering)
+- Business definitions (how to calculate revenue)
+- Standard join patterns
+
+### 3. User Query: "Show me total revenue by product category"
+
+The agent identifies this as a **revenue analysis** task involving **products** and **order_items**.
+
+Before writing SQL, it retrieves relevant documentation:
+
+```sql
+-- Load domain and table context
+SELECT resource_type, resource_name, description, full_markdown
+FROM _agents._agents
+WHERE resource_name IN ('revenue_analysis', 'ecommerce.order_items', 'ecommerce.products', 'ecommerce.orders');
+```
+
+The agent now knows:
+- To calculate revenue as `quantity * unit_price` (from `order_items` docs)
+- To filter out canceled orders (from `revenue_analysis` domain docs)
+- To exclude test customers (from `revenue_analysis` domain docs)
+- To join to `products` for category rollups (from global + table docs)
+
+### 4. Final SQL Query
+
+```sql
+-- Total revenue by product category
+-- Following DB-AGENTS guidance:
+-- - Using order_items.quantity * unit_price for revenue (per order_items table docs)
+-- - Filtering canceled orders and test customers (per revenue_analysis domain docs)
+-- - Joining to products for categories (per global conventions)
+
+SELECT
+  p.category,
+  SUM(oi.quantity * oi.unit_price) AS total_revenue
+FROM ecommerce.order_items oi
+  JOIN ecommerce.orders o ON oi.order_id = o.order_id
+  JOIN ecommerce.products p ON oi.product_id = p.product_id
+  JOIN ecommerce.customers c ON o.customer_id = c.customer_id
+WHERE o.status != 'canceled'
+  AND c.is_test = false
+GROUP BY p.category
+ORDER BY total_revenue DESC;
+```
+
+**Key Points:**
+- The agent did NOT use `orders.total_amount` (which includes shipping/tax)
+- It applied business filters (canceled orders, test customers) that weren't explicitly requested but are documented conventions
+- It retrieved only the context it needed (3 tables + 1 domain), not all available documentation
+- The SQL includes a comment explaining which docs influenced the approach
+
+---
+
 ## Relationship to Semantic Layers
 
 Traditional semantic layers:
