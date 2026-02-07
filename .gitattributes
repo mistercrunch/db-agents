@@ -1,0 +1,7 @@
+# Mark database files as binary (no diff, no merge)
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Mark CSV files as text with LF line endings
+*.csv text eol=lf
