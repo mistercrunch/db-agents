@@ -10,6 +10,29 @@ DB-AGENTS enables AI agents to better interface with databases by exposing conte
 
 ---
 
+## 🚀 Try It Now: `db-agents` CLI
+
+This repository includes **`db-agents`** (alias: `dba`), a proof-of-concept Python CLI tool for managing DB-AGENTS documentation.
+
+```bash
+# Quick start with the included jaffle shop example
+cd examples/jaffle-shop/DB-AGENTS
+dba validate  # ✓ All files valid, 5 resources found
+dba push      # Syncs documentation to database
+```
+
+**Features:**
+- 📝 Write documentation in markdown with YAML frontmatter
+- 🔄 Deterministic sync to `_agents._agents` table
+- ✅ Validation, diff, and status commands
+- 🎨 Beautiful terminal output with Rich
+- 🔐 Secret management with Jinja2 templates
+- 🗄️ Works with PostgreSQL, SQLite, and more
+
+**See:** [docs/CLI.md](docs/CLI.md) for full documentation and [examples/jaffle-shop/](examples/jaffle-shop/) for a complete example with the official dbt jaffle shop dataset.
+
+---
+
 ## Motivation
 
 Modern AI agents are already excellent at writing SQL.
@@ -584,6 +607,35 @@ The name matters less than the convention.
 
 ---
 
+## Implementation Status
+
+### ✅ Proof-of-Concept CLI Tool (`db-agents`)
+
+A fully functional Python CLI tool for managing DB-AGENTS documentation:
+
+**Core Features (Phase 1 - Complete):**
+- ✅ `init`, `validate`, `diff`, `push` commands
+- ✅ PostgreSQL and SQLite support
+- ✅ Deterministic sync (database = local files)
+- ✅ Secret management with environment variables
+- ✅ Rich terminal output
+- ✅ 37 passing tests with integration coverage
+- ✅ Real-world example with dbt jaffle shop data
+
+**Documentation:**
+- [docs/CLI.md](docs/CLI.md) - Full CLI documentation
+- [QUICK_START.md](QUICK_START.md) - 5-minute getting started
+- [examples/jaffle-shop/](examples/jaffle-shop/) - Complete working example
+
+**Install:**
+```bash
+uv venv && source .venv/bin/activate
+uv pip install -e ".[postgres]"
+dba --help
+```
+
+---
+
 ## Next Steps
 
 1. **Reference system prompts**
@@ -598,12 +650,14 @@ The name matters less than the convention.
     - semantic alignment
     - iteration count
     - error rates
-3. **Authoring & management tooling**
+
+3. **Enhanced tooling (Phase 2+)**
+    - `status`, `check`, `resource search` commands
+    - Multi-database support (MySQL, Snowflake, BigQuery)
+    - Pull functionality (database → local files)
     - GUI to browse `_agents._agents`
-    - versioning / diffs
-    - validation (missing globals, broken references)
-    - previews of agent context loading
+
 4. **Open iteration**
-    - real warehouses
-    - real agents
-    - evolve the standard based on usage
+    - Real warehouse deployments
+    - Real agent integrations
+    - Evolve the standard based on usage
